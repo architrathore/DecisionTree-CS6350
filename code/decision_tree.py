@@ -1,3 +1,4 @@
+#!/bin/python
 '''
 Implementation of decision tree for Machine Learning-CS6350
 Author: Archit Rathore
@@ -22,16 +23,15 @@ class DecisionNode:
 
     def __init__(self, attr_index):
         self.attr_index = attr_index  # index of attribute that is tested in the
-        # feature array, -1 for leaf nodes
-        self.prediction = None  # the prediction from this node, None for all non-leaf nodes
-        self.branches = {}  # dictionary holding subtrees of the tree, empty for leaf nodes
+                                      # feature array, -1 for leaf nodes
+        self.prediction = None        # the prediction from this node, None for all non-leaf nodes
+        self.branches = {}            # dictionary holding subtrees of the tree, empty for leaf nodes
 
     def __repr__(self):
         if self.attr_index == -1:
             return '["{0}"]'.format(self.prediction)
         else:
             return '[{}]'.format(str(self.attr_index))
-
 
 def read_dataset(filepath):
     '''Read train or test file and return a list DataRecord objects'''
@@ -59,9 +59,37 @@ def check_same_label(arr):
     return len(set(arr)) == 1
 
 
-def find_best_split(dataset, attributes, labels):
+def get_entropy(labels):
+    prob_pos, prob_neg = sum(labels == 1) / len(labels), sum(labels == 0) / len(labels)
+    if prob_pos == 0 or prob_neg == 0:
+        return 0
+    entropy = prob_pos * np.log(prob_pos) + prob_neg * np.log(prob_neg)
+    return -1.0 * entropy
+
+
+def find_best_split(S, attributes, labels):
     # Return the first attribute for now
-    return list(attributes)[0]
+    # return list(attributes)[0]
+    '''Implements information gain based on reduction in entropy
+    for feature selection'''
+
+    if len(attributes) == 0:
+        return next(iter(attributes))
+    max_info_gain = 0
+    best_split_attribute = None
+    root_node_entropy = get_entropy(labels)
+    for attribute in attributes:
+        attribute_value_set = set(S[:, attribute])
+        weighted_entropy = 0
+        for value in attribute_value_set:
+            value_indices = S[:, attribute] == value
+            value_labels = labels[value_indices]
+            weighted_entropy += len(value_labels) * get_entropy(value_labels)
+        info_gain = root_node_entropy - weighted_entropy / len(S)
+        if info_gain >= max_info_gain:
+            best_split_attribute = attribute
+            max_info_gain = info_gain
+    return best_split_attribute
 
 
 def ID3(S, attributes, labels):
@@ -112,24 +140,55 @@ def ID3(S, attributes, labels):
 
 
 def print_tree(decision_tree):
+    '''Do a level order traversal to print the decision tree'''
+    # Create two queues, one holds the current depth nodes
+    # and the other holds the nodes of the next level
     curr_level, next_level = [], []
+    
+    # Append the root to current level's queue
     curr_level.append(decision_tree)
+    
+    # While there are still nodes to visit
     while (len(curr_level) > 0):
+        # Get the first node in queue
         curr_node = curr_level.pop(0)
+        
+        # Print it's data
         print(curr_node, end=' ')
+        
+        # For each child of the current node
         for branch in curr_node.branches:
+            # Add all children to the next level's queue
             next_level.append(curr_node.branches[branch])
+            
+        # If the current level's queue is empty
         if len(curr_level) == 0:
             print()
+            # Swap current and next level queues
             curr_level, next_level = next_level, curr_level
 
 
 def predict(decision_tree, x):
+    '''Given a decision tree and input, find the prediction'''
+    
+    # If the given node is leaf
     if decision_tree.attr_index == -1:
         return decision_tree.prediction
+    
+    # Recursively call prediction based on current node's splitting attribute
     else:
         decision_attr_val = x[decision_tree.attr_index]
         return predict(decision_tree.branches[decision_attr_val], x)
+
+
+def accuracy(decision_tree, X, y_true):
+    '''Find the accuracy of given decision tree on dataset X with 
+    ground truth y_true'''
+
+    y_pred = np.apply_along_axis(lambda x: predict(decision_tree, x), 1, X)
+    correct_pred_count = sum(y_pred == y_true)
+    return correct_pred_count/len(y_true)
+
 
 
 dataset = read_dataset('../Dataset/updated_train.txt')
@@ -143,10 +202,13 @@ func_list = [lambda x: x[0] in ['a','e','i','o','u'],    # first letter is vowel
 X = build_features(dataset, func_list)
 y = np.array([d.label for d in dataset])
 attributes = set(range(0, (X.shape[1])))
+dec_tree = ID3(X, attributes, y)
 
-X_and = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-y_and = np.array([0, 0, 0, 1])
-# a = ID3(X, attributes, y)
-a = ID3(X_and, {0,1}, y_and)
-print_tree(a)
-print(predict(a, np.array([1, 1])))
+# X_and = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+# y_and = np.array([0, 0, 0, 1])
+# dec_tree = ID3(X_and, {0,1}, y_and)
+
+# print_tree(dec_tree)
+# print(predict(dec_tree, np.array([1, 1])))
+
+print(accuracy(dec_tree, X, y))
