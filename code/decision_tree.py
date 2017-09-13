@@ -1,7 +1,8 @@
 #!/bin/python
 '''
 Implementation of decision tree for Machine Learning-CS6350
-Author: Archit Rathore
+Author:         Archit Rathore
+Python version: 3.5
 '''
 import numpy as np
 from collections import Counter
